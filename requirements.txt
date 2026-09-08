@@ -1,0 +1,5 @@
+behave
+requests
+pyyaml
+allure-behave
+python-dotenv

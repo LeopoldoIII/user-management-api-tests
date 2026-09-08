@@ -1,0 +1,12 @@
+dev:
+  base_url: "http://localhost:3000/dev"
+  token_env_var: "DEV_AUTH_TOKEN"
+
+prod:
+  base_url: "http://localhost:3000/prod"
+  token_env_var: "PROD_AUTH_TOKEN"
+
+# Example:
+# staging:
+#   base_url: "http://localhost:3000/staging"
+#   token_env_var: "STAGING_AUTH_TOKEN"
