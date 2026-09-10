@@ -1,0 +1,150 @@
+name: API Test Suite — User Management
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:   # allows manual execution from GitHub UI
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job DEV 
+  # ─────────────────────────────────────────────────────────────
+  test-dev:
+    name: "E2E Tests — DEV"
+    runs-on: ubuntu-latest
+    # continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install Allure CLI
+        run: |
+          npm install -g allure-commandline --save-dev
+          allure --version
+
+      - name: API container
+        run: |
+          docker run -d -p 3000:3000 \
+            --name api-dev \
+            ghcr.io/danielsilva-loanpro/sdet-interview-challenge:latest
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API..."
+          for i in {1..15}; do
+            if curl -sf http://localhost:3000/dev/users > /dev/null; then
+              echo "API ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run DEV tests
+        env:
+          DEV_AUTH_TOKEN: ${{ secrets.DEV_AUTH_TOKEN }}
+        run: |
+          python3 -m behave -D env=dev \
+            --tags=@dev \
+            --format allure_behave.formatter:AllureFormatter \
+            -o reports/allure-results \
+            --format pretty \
+            --no-capture
+        continue-on-error: false   # reports bugs without blocking the pipeline
+
+      - name: Generate Allure Report
+        if: always()
+        run: allure generate reports/allure-results -o reports/allure-html --clean --single-file
+
+      - name: Upload Allure Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-dev
+          path: reports/allure-html
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # Job PROD
+  # ─────────────────────────────────────────────────────────────
+  test-prod:
+    name: "E2E Tests — PROD"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install Allure CLI
+        run: |
+          npm install -g allure-commandline --save-dev
+          allure --version
+
+      - name: Start API container
+        run: |
+          docker run -d -p 3000:3000 \
+            --name api-prod \
+            ghcr.io/danielsilva-loanpro/sdet-interview-challenge:latest
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API..."
+          for i in {1..15}; do
+            if curl -sf http://localhost:3000/prod/users > /dev/null; then
+              echo "API ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run PROD tests
+        env:
+          PROD_AUTH_TOKEN: ${{ secrets.PROD_AUTH_TOKEN }}
+        run: |
+          python3 -m behave -D env=prod \
+            --tags=@prod \
+            --format allure_behave.formatter:AllureFormatter \
+            -o reports/allure-results \
+            --format pretty \
+            --no-capture
+        continue-on-error: false   # reports bugs without blocking the pipeline
+
+      - name: Generate Allure Report
+        if: always()
+        run: allure generate reports/allure-results -o reports/allure-html --clean --single-file
+
+      - name: Upload Allure Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-prod
+          path: reports/allure-html
+          retention-days: 7
