@@ -1,0 +1,285 @@
+Feature: Security — Input Validation and Abuse Prevention # features/security.feature:1
+
+  @dev @prod @security
+  Scenario Outline: API response to malicious payloads (SQLi / XSS) — contract gap -- @1.1                                 # features/security.feature:26
+    When I send a POST request to "/users" with name "Robert'); DROP TABLE users;--", email "sqli@loanpro.com", and age 30 # steps/user_steps.py:81
+    Then the response status code should be 400                                                                            # steps/common_steps.py:26
+    And the response body should contain a validation error message                                                        # steps/common_steps.py:116
+
+  @dev @prod @security
+  Scenario Outline: API response to malicious payloads (SQLi / XSS) — contract gap -- @1.2                                # features/security.feature:27
+    When I send a POST request to "/users" with name "<script>alert("XSS")</script>", email "xss@loanpro.com", and age 30 # steps/user_steps.py:81
+    Then the response status code should be 400                                                                           # steps/common_steps.py:26
+    And the response body should contain a validation error message                                                       # steps/common_steps.py:116
+
+  @dev @prod @security
+  Scenario Outline: API response to malicious payloads (SQLi / XSS) — contract gap -- @1.3                           # features/security.feature:28
+    When I send a POST request to "/users" with name "<h1>HTML Injection</h1>", email "html@loanpro.com", and age 30 # steps/user_steps.py:81
+    Then the response status code should be 400                                                                      # steps/common_steps.py:26
+    And the response body should contain a validation error message                                                  # steps/common_steps.py:116
+
+  @dev @prod @security
+  Scenario: API response to a massive payload — contract gap             # features/security.feature:31
+    When I send a POST request to "/users" with a name of 500 characters # steps/user_steps.py:139
+    Then the response status code should be 400                          # steps/common_steps.py:26
+    And the response body should contain a validation error message      # steps/common_steps.py:116
+
+Feature: DELETE /users/{email} — Delete User # features/users_delete.feature:1
+
+  @dev @prod
+  Scenario: Delete a user successfully with valid authentication                                  # features/users_delete.feature:8
+    Given a user with email "delete@loanpro.com" exists                                           # steps/user_steps.py:34
+    When I send a DELETE request to "/users/delete@loanpro.com" with a valid Authentication token # steps/user_steps.py:246
+    Then the response status code should be 204                                                   # steps/common_steps.py:26
+
+  @dev @prod @BUG-005
+  Scenario: Fail to delete a user without authentication                                        # features/users_delete.feature:18
+    Given a user with email "noauth@loanpro.com" exists                                         # steps/user_steps.py:34
+    When I send a DELETE request to "/users/noauth@loanpro.com" without an Authentication token # steps/user_steps.py:254
+    Then the response status code should be 401                                                 # steps/common_steps.py:26
+    And the response body should contain an authentication error message                        # steps/common_steps.py:155
+
+  @dev @prod @BUG-005
+  Scenario: Fail to delete a user with invalid authentication token                                       # features/users_delete.feature:25
+    Given a user with email "invalidauth@loanpro.com" exists                                              # steps/user_steps.py:34
+    When I send a DELETE request to "/users/invalidauth@loanpro.com" with an invalid Authentication token # steps/user_steps.py:262
+    Then the response status code should be 401                                                           # steps/common_steps.py:26
+    And the response body should contain an authentication error message                                  # steps/common_steps.py:155
+
+  @dev @prod
+  Scenario: Fail to delete a non-existent user                                                         # features/users_delete.feature:36
+    When I send a DELETE request to "/users/nonexistent@loanpro.com" with a valid Authentication token # steps/user_steps.py:246
+    Then the response status code should be 404                                                        # steps/common_steps.py:26
+    And the response body should contain a user not found error message                                # steps/common_steps.py:142
+
+Feature: GET /users and GET /users/{email} — List and Retrieve Users # features/users_get.feature:1
+
+  @dev @prod
+  Scenario: List empty list of users — validate response is a JSON array  # features/users_get.feature:8
+    When I send a GET request to "/users"                                 # steps/user_steps.py:154
+    Then the response status code should be 200                           # steps/common_steps.py:26
+    And the response body should be a JSON array                          # steps/common_steps.py:39
+
+  @dev @prod
+  Scenario: List multiple users successfully               # features/users_get.feature:14
+    Given 10 users are created in the system               # steps/user_steps.py:65
+    When I send a GET request to "/users"                  # steps/user_steps.py:154
+    Then the response status code should be 200            # steps/common_steps.py:26
+    And the response body should be a JSON array           # steps/common_steps.py:39
+    And the response body should contain at least 10 users # steps/common_steps.py:48
+
+  @dev @prod
+  Scenario: Get an existing user by email                      # features/users_get.feature:26
+    Given a user with email "existing@loanpro.com" exists      # steps/user_steps.py:34
+    When I send a GET request to "/users/existing@loanpro.com" # steps/user_steps.py:160
+    Then the response status code should be 200                # steps/common_steps.py:26
+    And the response body should contain the user details      # steps/common_steps.py:69
+
+  @dev @prod @BUG-004
+  Scenario: Fail to get a non-existent user                             # features/users_get.feature:33
+    When I send a GET request to "/users/nonexistent@loanpro.com"       # steps/user_steps.py:160
+    Then the response status code should be 404                         # steps/common_steps.py:26
+    And the response body should contain a user not found error message # steps/common_steps.py:142
+
+Feature: POST /users — Create User # features/users_post.feature:1
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.1                                                # features/users_post.feature:14
+    When I send a POST request to "/users" with name "John Doe", email "john.doe@loanpro.com", and age 30 # steps/user_steps.py:81
+    Then the response status code should be 201                                                           # steps/common_steps.py:26
+    And the response body should contain the created user details                                         # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.2                                              # features/users_post.feature:15
+    When I send a POST request to "/users" with name "Jane TT", email "jane.TT@loanpro.com", and age 25 # steps/user_steps.py:81
+    Then the response status code should be 201                                                         # steps/common_steps.py:26
+    And the response body should contain the created user details                                       # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.3                                                          # features/users_post.feature:16
+    When I send a POST request to "/users" with name "Alice Johnson", email "alice.johnson@loanpro.com", and age 40 # steps/user_steps.py:81
+    Then the response status code should be 201                                                                     # steps/common_steps.py:26
+    And the response body should contain the created user details                                                   # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.4                                               # features/users_post.feature:17
+    When I send a POST request to "/users" with name "Bob bb", email "bob.brown@loanpro.com", and age 55 # steps/user_steps.py:81
+    Then the response status code should be 201                                                          # steps/common_steps.py:26
+    And the response body should contain the created user details                                        # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.5                                                          # features/users_post.feature:18
+    When I send a POST request to "/users" with name "Charlie Davis", email "charlie.davis@loanpro.com", and age 22 # steps/user_steps.py:81
+    Then the response status code should be 201                                                                     # steps/common_steps.py:26
+    And the response body should contain the created user details                                                   # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Create a new user successfully -- @1.6                                          # features/users_post.feature:20
+    When I send a POST request to "/users" with name "R2-D2", email "R2-D2@loanpro.com", and age 10 # steps/user_steps.py:81
+    Then the response status code should be 201                                                     # steps/common_steps.py:26
+    And the response body should contain the created user details                                   # steps/common_steps.py:60
+
+  @dev @prod
+  Scenario Outline: Validate user age with valid/invalid age values -- @1.1   # features/users_post.feature:32
+    When I send a POST request to "/users" with age 1                         # steps/user_steps.py:92
+    Then the response status code should be 201                               # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Validate user age with valid/invalid age values -- @1.2   # features/users_post.feature:33
+    When I send a POST request to "/users" with age 0                         # steps/user_steps.py:92
+    Then the response status code should be 400                               # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Validate user age with valid/invalid age values -- @1.3   # features/users_post.feature:34
+    When I send a POST request to "/users" with age -5                        # steps/user_steps.py:92
+    Then the response status code should be 400                               # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Validate user age with valid/invalid age values -- @1.4   # features/users_post.feature:35
+    When I send a POST request to "/users" with age 150                       # steps/user_steps.py:92
+    Then the response status code should be 201                               # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Validate user age with valid/invalid age values -- @1.5   # features/users_post.feature:36
+    When I send a POST request to "/users" with age 151                       # steps/user_steps.py:92
+    Then the response status code should be 400                               # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Fail to create a user with missing required fields -- @1.1   # features/users_post.feature:49
+    When I send a POST request to "/users" missing the "name" field              # steps/user_steps.py:112
+    Then the response status code should be 400                                  # steps/common_steps.py:26
+    And the response body should contain a validation error message              # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario Outline: Fail to create a user with missing required fields -- @1.2   # features/users_post.feature:50
+    When I send a POST request to "/users" missing the "email" field             # steps/user_steps.py:112
+    Then the response status code should be 400                                  # steps/common_steps.py:26
+    And the response body should contain a validation error message              # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario Outline: Fail to create a user with missing required fields -- @1.3   # features/users_post.feature:51
+    When I send a POST request to "/users" missing the "age" field               # steps/user_steps.py:112
+    Then the response status code should be 400                                  # steps/common_steps.py:26
+    And the response body should contain a validation error message              # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario: Fail to create a user with empty request body           # features/users_post.feature:54
+    When I send a POST request to "/users" with an empty body       # steps/user_steps.py:130
+    Then the response status code should be 400                     # steps/common_steps.py:26
+    And the response body should contain a validation error message # steps/common_steps.py:116
+
+  @dev @prod @BUG-001
+  Scenario Outline: Fail to create a user with a duplicate email -- @1.1              # features/users_post.feature:71
+    Given a user with email "hannah.irving@loanpro.com" already exists                # steps/user_steps.py:34
+    When I send a POST request to "/users" with the email "hannah.irving@loanpro.com" # steps/user_steps.py:103
+    Then the response status code should be 409                                       # steps/common_steps.py:26
+    And the response body should contain a duplicate email error message              # steps/common_steps.py:129
+
+  @dev @prod @BUG-001
+  Scenario Outline: Fail to create a user with a duplicate email -- @1.2              # features/users_post.feature:72
+    Given a user with email "george.harris@loanpro.com" already exists                # steps/user_steps.py:34
+    When I send a POST request to "/users" with the email "george.harris@loanpro.com" # steps/user_steps.py:103
+    Then the response status code should be 409                                       # steps/common_steps.py:26
+    And the response body should contain a duplicate email error message              # steps/common_steps.py:129
+
+  @dev @prod @BUG-002
+  Scenario Outline: Fail to create a user with invalid email format -- @1.1            # features/users_post.feature:81
+    When I send a POST request to "/users" with an invalid email format "not-an-email" # steps/user_steps.py:121
+    Then the response status code should be 400                                        # steps/common_steps.py:26
+    And the response body should contain a validation error message                    # steps/common_steps.py:116
+
+  @dev @prod @BUG-002
+  Scenario Outline: Fail to create a user with invalid email format -- @1.2                   # features/users_post.feature:82
+    When I send a POST request to "/users" with an invalid email format "r2d2@xvhows@#$@.com" # steps/user_steps.py:121
+    Then the response status code should be 400                                               # steps/common_steps.py:26
+    And the response body should contain a validation error message                           # steps/common_steps.py:116
+
+Feature: PUT /users/{email} — Update User # features/users_put.feature:1
+
+  @dev @prod
+  Scenario: Update an existing user successfully                                     # features/users_put.feature:8
+    Given a user with email "update@loanpro.com" exists                              # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with valid updated data # steps/user_steps.py:170
+    Then the response status code should be 200                                      # steps/common_steps.py:26
+    And the response body should contain the updated user details                    # steps/common_steps.py:80
+
+  @dev @prod
+  Scenario Outline: Update a user with age boundary values -- @1.1      # features/users_put.feature:25
+    Given a user with email "update@loanpro.com" exists                 # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with age 0 # steps/user_steps.py:224
+    Then the response status code should be 400                         # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Update a user with age boundary values -- @1.2      # features/users_put.feature:26
+    Given a user with email "update@loanpro.com" exists                 # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with age 1 # steps/user_steps.py:224
+    Then the response status code should be 200                         # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Update a user with age boundary values -- @1.3        # features/users_put.feature:27
+    Given a user with email "update@loanpro.com" exists                   # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with age 150 # steps/user_steps.py:224
+    Then the response status code should be 200                           # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Update a user with age boundary values -- @1.4        # features/users_put.feature:28
+    Given a user with email "update@loanpro.com" exists                   # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with age 151 # steps/user_steps.py:224
+    Then the response status code should be 400                           # steps/common_steps.py:26
+
+  @dev @prod
+  Scenario Outline: Fail to update a user with missing required fields -- @1.1        # features/users_put.feature:42
+    Given a user with email "update@loanpro.com" exists                               # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" missing the "name" field # steps/user_steps.py:206
+    Then the response status code should be 400                                       # steps/common_steps.py:26
+    And the response body should contain a validation error message                   # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario Outline: Fail to update a user with missing required fields -- @1.2         # features/users_put.feature:43
+    Given a user with email "update@loanpro.com" exists                                # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" missing the "email" field # steps/user_steps.py:206
+    Then the response status code should be 400                                        # steps/common_steps.py:26
+    And the response body should contain a validation error message                    # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario Outline: Fail to update a user with missing required fields -- @1.3       # features/users_put.feature:44
+    Given a user with email "update@loanpro.com" exists                              # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" missing the "age" field # steps/user_steps.py:206
+    Then the response status code should be 400                                      # steps/common_steps.py:26
+    And the response body should contain a validation error message                  # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario: Fail to update a user with empty request body                       # features/users_put.feature:47
+    Given a user with email "update@loanpro.com" exists                         # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with an empty body # steps/user_steps.py:233
+    Then the response status code should be 400                                 # steps/common_steps.py:26
+    And the response body should contain a validation error message             # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario: Fail to update a user with invalid data — age out of range                   # features/users_put.feature:58
+    Given a user with email "update_invalid@example.com" exists                          # steps/user_steps.py:34
+    When I send a PUT request to "/users/update_invalid@example.com" with an invalid age # steps/user_steps.py:188
+    Then the response status code should be 400                                          # steps/common_steps.py:26
+    And the response body should contain a validation error message                      # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario: Fail to update a user with invalid email format in body                                      # features/users_put.feature:65
+    Given a user with email "update@loanpro.com" exists                                                  # steps/user_steps.py:34
+    When I send a PUT request to "/users/update@loanpro.com" with an invalid email format "not-an-email" # steps/user_steps.py:215
+    Then the response status code should be 400                                                          # steps/common_steps.py:26
+    And the response body should contain a validation error message                                      # steps/common_steps.py:116
+
+  @dev @prod
+  Scenario: Fail to update a non-existent user                                    # features/users_put.feature:76
+    When I send a PUT request to "/users/nonexistent@loanpro.com" with valid data # steps/user_steps.py:179
+    Then the response status code should be 404                                   # steps/common_steps.py:26
+    And the response body should contain a user not found error message           # steps/common_steps.py:142
+
+  @dev @prod
+  Scenario: Fail to update a user to a duplicate email                                                # features/users_put.feature:82
+    Given a user with email "user1@loanpro.com" exists                                                # steps/user_steps.py:34
+    And a user with email "user2@loanpro.com" exists                                                  # steps/user_steps.py:34
+    When I send a PUT request to "/users/user1@loanpro.com" changing the email to "user2@loanpro.com" # steps/user_steps.py:197
+    Then the response status code should be 409                                                       # steps/common_steps.py:26
+    And the response body should contain a duplicate email error message                              # steps/common_steps.py:129
+

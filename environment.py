@@ -56,9 +56,11 @@ def before_scenario(context, scenario):
         return
 
     context.api_client = ApiClient(context.base_url, context.auth_token)  # instance of ApiClient
-    context.response = None  # for validation Json and status
-    context.created_emails = [] # array of emails
-    context.user_data = {}
+    context.response = None        # holds the last HTTP response for Then steps
+    context.created_emails = []    # accumulates emails for automatic teardown
+    context.user_data = {}         # populated by Given steps (POST response body)
+    context.request_payload = {}   # stores the last sent request body for value comparison
+    context.last_path = ""         # stores the last request path for persistence GET check
 
 
 # """Deletes all users created during the scenario after scenario iteration"""
