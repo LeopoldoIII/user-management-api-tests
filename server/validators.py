@@ -14,8 +14,16 @@ def validate_user(data: dict, check_email_format: bool = True) -> str | None:
     Returns:
         Error message string if validation fails, None if valid.
     """
-    if not data.get("name"):
+    name = data.get("name")
+    if not name or not isinstance(name, str) or not name.strip():
         return "name is required"
+
+    if len(name) > 255:
+        return "name must be at most 255 characters"
+
+    # Reject potential injection payloads (SQLi / XSS / HTML tags)
+    if any(char in name for char in ["<", ">", ";", "--"]):
+        return "Invalid characters in name"
 
     if not data.get("email"):
         return "email is required"
