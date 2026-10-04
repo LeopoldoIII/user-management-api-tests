@@ -24,10 +24,16 @@ jobs:
     outputs:
       # Pass the exact image digest to test jobs so they pull the right build
       image: ${{ steps.meta.outputs.tags }}
+      # Lowercase image name (Docker refs must be lowercase; github.repository is not)
+      image_name: ${{ steps.image.outputs.name }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Compute lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/user-api" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -42,7 +48,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/user-api
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-,format=short
@@ -58,8 +64,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Cache layers across runs using ghcr.io to speed up re-builds
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/user-api:buildcache
-          cache-to:   type=registry,ref=ghcr.io/${{ github.repository }}/user-api:buildcache,mode=max
+          cache-from: type=registry,ref=${{ steps.image.outputs.name }}:buildcache
+          cache-to:   type=registry,ref=${{ steps.image.outputs.name }}:buildcache,mode=max
 
   # ─────────────────────────────────────────────────────────────
   # Job DEV
@@ -103,7 +109,7 @@ jobs:
         run: |
           docker run -d -p 3000:3000 \
             --name api-dev \
-            ghcr.io/${{ github.repository }}/user-api:latest
+            ${{ needs.build-api.outputs.image_name }}:latest
 
       - name: Wait for API to be ready
         run: |
@@ -181,7 +187,7 @@ jobs:
         run: |
           docker run -d -p 3000:3000 \
             --name api-prod \
-            ghcr.io/${{ github.repository }}/user-api:latest
+            ${{ needs.build-api.outputs.image_name }}:latest
 
       - name: Wait for API to be ready
         run: |
@@ -224,7 +230,7 @@ jobs:
   test-security:
     name: "Security Tests — DEV"
     runs-on: ubuntu-latest
-    needs: test-dev   # run after DEV so the infra is proven healthy
+    needs: [build-api, test-dev]   # run after DEV so the infra is proven healthy (build-api needed for image_name output)
 
     steps:
       - name: Checkout code
@@ -259,7 +265,7 @@ jobs:
         run: |
           docker run -d -p 3000:3000 \
             --name api-security \
-            ghcr.io/${{ github.repository }}/user-api:latest
+            ${{ needs.build-api.outputs.image_name }}:latest
 
       - name: Wait for API to be ready
         run: |
