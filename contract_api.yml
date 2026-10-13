@@ -139,6 +139,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /users/{email}/notes:
+    parameters:
+      - name: email
+        in: path
+        required: true
+        schema:
+          type: string
+          format: email
+        description: The user's email address
+    post:
+      summary: Add a note to a user
+      operationId: addNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddNoteRequest'
+      responses:
+        '201':
+          description: Note added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -161,6 +198,13 @@ components:
           minimum: 1
           maximum: 150
           example: 30
+        notes:
+          type: array
+          items:
+            type: string
+          description: Notes associated with the user
+          example:
+            - "First onboarding note"
 
     CreateUserRequest:
       type: object
@@ -210,3 +254,26 @@ components:
         error:
           type: string
           example: User not found
+
+    AddNoteRequest:
+      type: object
+      required:
+        - note
+      properties:
+        note:
+          type: string
+          example: "First onboarding note"
+
+    NoteResponse:
+      type: object
+      required:
+        - email
+        - note
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        note:
+          type: string
+          example: "First onboarding note"
